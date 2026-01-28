@@ -1,0 +1,299 @@
+/* Flutterbox - Dark minimal aesthetic */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg-dark: #0a0a0a;
+    --bg-card: #111111;
+    --text-primary: #e8e8e8;
+    --text-muted: #666666;
+    --text-dim: #444444;
+    --accent: #c4a77d;
+    --accent-dim: #8b7355;
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 600px;
+    width: 100%;
+    text-align: center;
+}
+
+header {
+    margin-bottom: 3rem;
+}
+
+h1 {
+    font-size: 2.5rem;
+    font-weight: 300;
+    letter-spacing: 0.3em;
+    text-transform: lowercase;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    font-size: 1rem;
+    color: var(--text-muted);
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    font-style: italic;
+}
+
+main {
+    margin-bottom: 3rem;
+}
+
+.player-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+}
+
+.photo-frame {
+    position: relative;
+    width: 100%;
+    max-width: 450px;
+    aspect-ratio: 4/3;
+    background: var(--bg-card);
+    border: 1px solid #222;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.5s ease;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.photo-frame:hover {
+    border-color: #333;
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.6);
+}
+
+.photo-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: grayscale(100%) contrast(1.1);
+    transition: all 0.8s ease;
+}
+
+.photo-frame:hover img {
+    filter: grayscale(100%) contrast(1.2);
+}
+
+.photo-frame.playing img {
+    filter: grayscale(100%) contrast(1.05) brightness(0.9);
+}
+
+.photo-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 10;
+}
+
+.photo-frame:hover .photo-overlay {
+    opacity: 1;
+}
+
+.photo-frame.playing .photo-overlay {
+    opacity: 0;
+}
+
+.play-indicator {
+    font-size: 3rem;
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
+    transition: transform 0.3s ease;
+}
+
+.photo-frame:hover .play-indicator {
+    transform: scale(1.1);
+}
+
+.photo-frame.playing .play-indicator {
+    display: none;
+}
+
+.controls {
+    display: flex;
+    gap: 1rem;
+}
+
+.upload-btn {
+    background: transparent;
+    border: 1px solid var(--text-dim);
+    color: var(--text-muted);
+    padding: 0.6rem 1.5rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.upload-btn:hover {
+    border-color: var(--text-muted);
+    color: var(--text-primary);
+}
+
+.status {
+    min-height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.status-text {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    font-style: italic;
+    letter-spacing: 0.05em;
+    transition: all 0.3s ease;
+}
+
+.status.active .status-text {
+    color: var(--accent-dim);
+}
+
+.status.loading .status-text {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+.visualizer {
+    width: 100%;
+    max-width: 450px;
+    height: 60px;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+.visualizer.active {
+    opacity: 1;
+}
+
+#waveform {
+    width: 100%;
+    height: 100%;
+}
+
+footer {
+    text-align: center;
+    padding-top: 2rem;
+    border-top: 1px solid #1a1a1a;
+}
+
+footer p {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.05em;
+}
+
+footer a {
+    color: var(--text-muted);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: all 0.3s ease;
+}
+
+footer a:hover {
+    color: var(--text-primary);
+    border-bottom-color: var(--text-muted);
+}
+
+.credit {
+    font-style: italic;
+}
+
+/* Loading shimmer for photo */
+.photo-frame.loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.03),
+        transparent
+    );
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    100% { left: 100%; }
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    body {
+        padding: 1.5rem;
+    }
+
+    h1 {
+        font-size: 1.8rem;
+        letter-spacing: 0.2em;
+    }
+
+    .subtitle {
+        font-size: 0.85rem;
+    }
+
+    .photo-frame {
+        max-width: 100%;
+    }
+
+    .play-indicator {
+        font-size: 2.5rem;
+    }
+}
+
+/* Vinyl spin animation for when playing */
+@keyframes subtlePulse {
+    0%, 100% {
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+    50% {
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 30px rgba(196, 167, 125, 0.05);
+    }
+}
+
+.photo-frame.playing {
+    animation: subtlePulse 4s ease-in-out infinite;
+}
