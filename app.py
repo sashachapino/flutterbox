@@ -243,16 +243,19 @@ def process_sample(audio):
     if audio.channels > 1:
         audio = audio.set_channels(1)
 
-    # Take a random segment (30-60 seconds worth before slowdown)
+    # Shorter, uneven segment lengths (prime-ish numbers in seconds)
+    # Creates hypnotic, unpredictable rhythm when layered
+    segment_durations = [7000, 11000, 13000, 17000, 19000, 23000]  # 7-23 seconds
     duration_ms = len(audio)
-    segment_length = min(random.randint(30000, 60000), duration_ms)
+    segment_length = min(random.choice(segment_durations), duration_ms)
 
     if duration_ms > segment_length:
         start = random.randint(0, duration_ms - segment_length)
         audio = audio[start:start + segment_length]
 
     # Slow down significantly (creates that haunting quality)
-    slowdown_factor = random.uniform(0.35, 0.55)
+    # Varying slowdown also adds to the unevenness
+    slowdown_factor = random.choice([0.33, 0.4, 0.45, 0.5, 0.55])
     audio = apply_slowdown(audio, slowdown_factor)
 
     # Convert to numpy for DSP
@@ -291,8 +294,8 @@ def process_sample(audio):
         channels=1
     )
 
-    # Fade in/out for smooth crossfading
-    fade_duration = min(3000, len(output_audio) // 4)
+    # Fade in/out for smooth crossfading (longer fades for dreamy quality)
+    fade_duration = min(5000, len(output_audio) // 3)
     output_audio = output_audio.fade_in(fade_duration).fade_out(fade_duration)
 
     return output_audio

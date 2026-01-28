@@ -5,47 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Flutterbox</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Flutterbox</h1>
-            <p class="subtitle">haunting ambient from forgotten vinyl</p>
-        </header>
-
-        <main>
-            <div class="player-container">
-                <div class="photo-frame" id="photoFrame">
-                    <div class="photo-overlay">
-                        <span class="play-indicator" id="playIndicator">▶</span>
-                    </div>
-                    <img id="coverPhoto" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23111'/%3E%3C/svg%3E" alt="Click to play">
-                    <input type="file" id="photoInput" accept="image/*" style="display: none;">
-                </div>
-
-                <div class="controls">
-                    <button class="upload-btn" id="uploadBtn">choose your own photo</button>
-                </div>
-
-                <div class="status" id="status">
-                    <span class="status-text">click the photograph to begin</span>
-                </div>
-
-                <div class="visualizer" id="visualizer">
-                    <canvas id="waveform"></canvas>
-                </div>
-            </div>
-        </main>
-
-        <footer>
-            <p>layering slowed 78rpm samples from <a href="https://archive.org" target="_blank">archive.org</a></p>
-            <p class="credit">inspired by philip jeck</p>
-        </footer>
+    <div class="photo-container" id="photoContainer">
+        <img id="coverPhoto" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23111'/%3E%3C/svg%3E" alt="">
+        <canvas id="rippleCanvas"></canvas>
+        <input type="file" id="photoInput" accept="image/*" style="display: none;">
     </div>
-
     <script src="{{ url_for('static', filename='js/player.js') }}"></script>
 </body>
 </html>

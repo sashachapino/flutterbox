@@ -1,127 +1,101 @@
 /**
- * Flutterbox Audio Player
- * Web Audio API-based ambient music player with crossfading
+ * Flutterbox - Photo breathes with the music
  */
 
-class FlutterboxPlayer {
+class Flutterbox {
     constructor() {
         this.audioContext = null;
         this.isPlaying = false;
-        this.currentSources = [];
-        this.gainNodes = [];
+        this.layers = []; // Multiple concurrent audio layers
         this.analyser = null;
-        this.loadingNext = false;
+        this.masterGain = null;
 
-        // Configuration
-        this.crossfadeDuration = 8; // seconds
-        this.overlapTime = 12; // seconds before end to start next
-        this.maxConcurrentLayers = 2;
+        // Layering config - uneven timing for hypnotic shifts
+        this.maxLayers = 4;
+        this.layerIntervals = [3000, 5000, 7000, 11000, 13000]; // Prime-ish numbers for unevenness
 
-        // UI Elements
-        this.photoFrame = document.getElementById('photoFrame');
-        this.coverPhoto = document.getElementById('coverPhoto');
+        this.container = document.getElementById('photoContainer');
+        this.photo = document.getElementById('coverPhoto');
+        this.canvas = document.getElementById('rippleCanvas');
+        this.ctx = this.canvas.getContext('2d');
         this.photoInput = document.getElementById('photoInput');
-        this.uploadBtn = document.getElementById('uploadBtn');
-        this.playIndicator = document.getElementById('playIndicator');
-        this.status = document.getElementById('status');
-        this.statusText = this.status.querySelector('.status-text');
-        this.visualizer = document.getElementById('visualizer');
-        this.canvas = document.getElementById('waveform');
-        this.canvasCtx = this.canvas.getContext('2d');
 
-        this.setupEventListeners();
+        this.container.classList.add('dormant');
         this.setupCanvas();
-        this.createDefaultImage();
-    }
-
-    setupEventListeners() {
-        this.photoFrame.addEventListener('click', () => this.togglePlayback());
-        this.uploadBtn.addEventListener('click', () => this.photoInput.click());
-        this.photoInput.addEventListener('change', (e) => this.handlePhotoUpload(e));
-
-        // Handle visibility change to save resources
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden && this.isPlaying) {
-                // Keep playing but stop visualization
-                this.stopVisualization();
-            } else if (!document.hidden && this.isPlaying) {
-                this.startVisualization();
-            }
-        });
+        this.setupEvents();
+        this.createDefaultPhoto();
     }
 
     setupCanvas() {
         const resize = () => {
-            const rect = this.canvas.parentElement.getBoundingClientRect();
-            this.canvas.width = rect.width * window.devicePixelRatio;
-            this.canvas.height = rect.height * window.devicePixelRatio;
-            this.canvasCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
         };
         resize();
         window.addEventListener('resize', resize);
     }
 
-    createDefaultImage() {
-        // Create a moody default image if none exists
+    setupEvents() {
+        this.container.addEventListener('click', (e) => {
+            // Secret: double-click to upload photo
+            if (e.detail === 2) {
+                this.photoInput.click();
+            } else {
+                this.toggle();
+            }
+        });
+
+        this.photoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    this.photo.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    createDefaultPhoto() {
+        // Create an atmospheric default
         const canvas = document.createElement('canvas');
-        canvas.width = 800;
-        canvas.height = 600;
+        canvas.width = 1920;
+        canvas.height = 1080;
         const ctx = canvas.getContext('2d');
 
-        // Create atmospheric gradient
-        const gradient = ctx.createRadialGradient(400, 300, 0, 400, 300, 500);
-        gradient.addColorStop(0, '#2a2a2a');
-        gradient.addColorStop(0.5, '#1a1a1a');
-        gradient.addColorStop(1, '#0a0a0a');
-
+        // Dark gradient
+        const gradient = ctx.createRadialGradient(960, 540, 0, 960, 540, 900);
+        gradient.addColorStop(0, '#1a1a1a');
+        gradient.addColorStop(0.5, '#0d0d0d');
+        gradient.addColorStop(1, '#000000');
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 800, 600);
+        ctx.fillRect(0, 0, 1920, 1080);
 
-        // Add some noise texture
-        const imageData = ctx.getImageData(0, 0, 800, 600);
-        const data = imageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-            const noise = (Math.random() - 0.5) * 20;
-            data[i] += noise;
-            data[i + 1] += noise;
-            data[i + 2] += noise;
+        // Add subtle noise
+        const imageData = ctx.getImageData(0, 0, 1920, 1080);
+        for (let i = 0; i < imageData.data.length; i += 4) {
+            const noise = (Math.random() - 0.5) * 15;
+            imageData.data[i] += noise;
+            imageData.data[i + 1] += noise;
+            imageData.data[i + 2] += noise;
         }
         ctx.putImageData(imageData, 0, 0);
 
-        // Add subtle vignette text
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
-        ctx.font = '14px Cormorant Garamond, serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('upload your photograph', 400, 580);
-
-        this.coverPhoto.src = canvas.toDataURL('image/jpeg', 0.9);
+        this.photo.src = canvas.toDataURL('image/jpeg', 0.9);
     }
 
-    handlePhotoUpload(event) {
-        const file = event.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                this.coverPhoto.src = e.target.result;
-                this.updateStatus('photograph loaded');
-                setTimeout(() => this.updateStatus('click the photograph to begin'), 2000);
-            };
-            reader.readAsDataURL(file);
-        }
-    }
-
-    async initAudioContext() {
+    async initAudio() {
         if (!this.audioContext) {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
-            // Create master gain
             this.masterGain = this.audioContext.createGain();
+            this.masterGain.gain.value = 0.8;
             this.masterGain.connect(this.audioContext.destination);
 
-            // Create analyser for visualization
             this.analyser = this.audioContext.createAnalyser();
-            this.analyser.fftSize = 256;
-            this.analyser.smoothingTimeConstant = 0.8;
+            this.analyser.fftSize = 512;
+            this.analyser.smoothingTimeConstant = 0.85;
             this.masterGain.connect(this.analyser);
         }
 
@@ -130,7 +104,7 @@ class FlutterboxPlayer {
         }
     }
 
-    async togglePlayback() {
+    async toggle() {
         if (this.isPlaying) {
             this.stop();
         } else {
@@ -139,78 +113,87 @@ class FlutterboxPlayer {
     }
 
     async start() {
-        try {
-            await this.initAudioContext();
-            this.isPlaying = true;
+        await this.initAudio();
+        this.isPlaying = true;
 
-            this.photoFrame.classList.add('playing');
-            this.visualizer.classList.add('active');
-            this.status.classList.add('active');
-            this.playIndicator.textContent = '❚❚';
+        // Awaken - slow fade in
+        this.container.classList.remove('dormant');
+        this.container.classList.add('awakening');
 
-            this.updateStatus('summoning sounds from the archive...');
+        // Start loading first layer
+        this.scheduleNextLayer();
 
-            // Start first layer
-            await this.loadAndPlaySample();
+        // Start visual reactivity
+        this.animate();
 
-            // Start visualization
-            this.startVisualization();
-
-        } catch (error) {
-            console.error('Error starting playback:', error);
-            this.updateStatus('error connecting to the archive');
-            this.stop();
-        }
+        // Transition to full playing state after initial fade
+        setTimeout(() => {
+            if (this.isPlaying) {
+                this.container.classList.remove('awakening');
+                this.container.classList.add('playing');
+            }
+        }, 8000);
     }
 
     stop() {
         this.isPlaying = false;
 
-        // Fade out all current sources
-        const fadeOutTime = 2;
-        const now = this.audioContext?.currentTime || 0;
-
-        this.gainNodes.forEach(gain => {
-            gain.gain.linearRampToValueAtTime(0, now + fadeOutTime);
+        // Clear scheduled layers
+        this.layers.forEach(layer => {
+            if (layer.timeout) clearTimeout(layer.timeout);
+            if (layer.gain) {
+                layer.gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 3);
+            }
         });
 
-        // Stop sources after fade
         setTimeout(() => {
-            this.currentSources.forEach(source => {
-                try {
-                    source.stop();
-                } catch (e) {}
+            this.layers.forEach(layer => {
+                try { layer.source?.stop(); } catch(e) {}
             });
-            this.currentSources = [];
-            this.gainNodes = [];
-        }, fadeOutTime * 1000);
+            this.layers = [];
+        }, 3000);
 
-        this.photoFrame.classList.remove('playing');
-        this.visualizer.classList.remove('active');
-        this.status.classList.remove('active');
-        this.playIndicator.textContent = '▶';
-
-        this.updateStatus('click the photograph to begin');
-        this.stopVisualization();
+        this.container.classList.remove('playing', 'awakening');
+        this.container.classList.add('dormant');
     }
 
-    async loadAndPlaySample() {
-        if (!this.isPlaying || this.loadingNext) return;
+    scheduleNextLayer() {
+        if (!this.isPlaying) return;
 
-        this.loadingNext = true;
+        // Random interval from our uneven set
+        const interval = this.layerIntervals[Math.floor(Math.random() * this.layerIntervals.length)];
+
+        setTimeout(() => {
+            if (this.isPlaying) {
+                this.loadLayer();
+                this.scheduleNextLayer();
+            }
+        }, interval);
+
+        // Also load immediately if we have no layers
+        if (this.layers.length === 0) {
+            this.loadLayer();
+        }
+    }
+
+    async loadLayer() {
+        if (!this.isPlaying) return;
+
+        // Remove finished layers
+        this.layers = this.layers.filter(l => !l.ended);
+
+        // Don't exceed max layers
+        if (this.layers.length >= this.maxLayers) return;
 
         try {
-            this.updateStatus('fetching vinyl from the archive...');
-
             const response = await fetch('/api/sample');
-            if (!response.ok) throw new Error('Failed to fetch sample');
+            if (!response.ok) return;
 
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
 
-            this.updateStatus('playing');
+            if (!this.isPlaying) return;
 
-            // Create source and gain
             const source = this.audioContext.createBufferSource();
             const gain = this.audioContext.createGain();
 
@@ -218,138 +201,144 @@ class FlutterboxPlayer {
             source.connect(gain);
             gain.connect(this.masterGain);
 
-            // Fade in
+            // Random volume for each layer (creates depth)
+            const targetVolume = 0.3 + Math.random() * 0.5;
+
+            // Slow fade in
             gain.gain.setValueAtTime(0, this.audioContext.currentTime);
-            gain.gain.linearRampToValueAtTime(0.7, this.audioContext.currentTime + this.crossfadeDuration);
+            gain.gain.linearRampToValueAtTime(targetVolume, this.audioContext.currentTime + 6);
 
-            // Track sources
-            this.currentSources.push(source);
-            this.gainNodes.push(gain);
-
-            // Clean up old layers if we have too many
-            while (this.currentSources.length > this.maxConcurrentLayers) {
-                const oldSource = this.currentSources.shift();
-                const oldGain = this.gainNodes.shift();
-                oldGain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + this.crossfadeDuration);
-                setTimeout(() => {
-                    try { oldSource.stop(); } catch(e) {}
-                }, this.crossfadeDuration * 1000);
-            }
-
-            // Start playback
-            source.start();
-
-            // Schedule next sample before this one ends
-            const duration = audioBuffer.duration;
-            const nextLoadTime = Math.max(0, (duration - this.overlapTime) * 1000);
-
-            source.onended = () => {
-                // Remove from tracking
-                const idx = this.currentSources.indexOf(source);
-                if (idx > -1) {
-                    this.currentSources.splice(idx, 1);
-                    this.gainNodes.splice(idx, 1);
-                }
+            const layer = {
+                source,
+                gain,
+                ended: false,
+                startTime: this.audioContext.currentTime
             };
 
-            // Load next sample with overlap
+            source.onended = () => {
+                layer.ended = true;
+            };
+
+            // Schedule fade out before end
+            const duration = audioBuffer.duration;
+            const fadeOutStart = Math.max(0, duration - 8);
+
             setTimeout(() => {
-                this.loadingNext = false;
-                if (this.isPlaying) {
-                    this.loadAndPlaySample();
+                if (!layer.ended && this.isPlaying) {
+                    gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 6);
                 }
-            }, nextLoadTime);
+            }, fadeOutStart * 1000);
 
-        } catch (error) {
-            console.error('Error loading sample:', error);
-            this.updateStatus('searching for more vinyl...');
-            this.loadingNext = false;
+            source.start();
+            this.layers.push(layer);
 
-            // Retry after a delay
-            if (this.isPlaying) {
-                setTimeout(() => this.loadAndPlaySample(), 3000);
-            }
+        } catch (e) {
+            console.error('Layer load error:', e);
         }
     }
 
-    updateStatus(text) {
-        this.statusText.textContent = text;
-        if (text.includes('fetching') || text.includes('searching') || text.includes('summoning')) {
-            this.status.classList.add('loading');
-        } else {
-            this.status.classList.remove('loading');
+    animate() {
+        if (!this.isPlaying) {
+            // Clear canvas when stopped
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            return;
         }
-    }
 
-    startVisualization() {
+        requestAnimationFrame(() => this.animate());
+
         if (!this.analyser) return;
 
-        const bufferLength = this.analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
+        // Get audio data
+        const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+        this.analyser.getByteFrequencyData(dataArray);
 
-        const draw = () => {
-            if (!this.isPlaying) return;
+        // Calculate average levels for different frequency bands
+        const bass = this.getAverage(dataArray, 0, 10) / 255;
+        const mid = this.getAverage(dataArray, 10, 100) / 255;
+        const high = this.getAverage(dataArray, 100, 200) / 255;
+        const overall = this.getAverage(dataArray, 0, dataArray.length) / 255;
 
-            this.animationFrame = requestAnimationFrame(draw);
+        // Photo reactivity
+        this.updatePhotoEffects(bass, mid, high, overall);
 
-            this.analyser.getByteFrequencyData(dataArray);
-
-            const width = this.canvas.width / window.devicePixelRatio;
-            const height = this.canvas.height / window.devicePixelRatio;
-
-            // Clear with fade effect
-            this.canvasCtx.fillStyle = 'rgba(10, 10, 10, 0.3)';
-            this.canvasCtx.fillRect(0, 0, width, height);
-
-            // Draw subtle waveform
-            this.canvasCtx.strokeStyle = 'rgba(196, 167, 125, 0.3)';
-            this.canvasCtx.lineWidth = 1;
-            this.canvasCtx.beginPath();
-
-            const sliceWidth = width / bufferLength;
-            let x = 0;
-
-            for (let i = 0; i < bufferLength; i++) {
-                const v = dataArray[i] / 255.0;
-                const y = height / 2 + (v - 0.5) * height * 0.8;
-
-                if (i === 0) {
-                    this.canvasCtx.moveTo(x, y);
-                } else {
-                    this.canvasCtx.lineTo(x, y);
-                }
-
-                x += sliceWidth;
-            }
-
-            this.canvasCtx.stroke();
-
-            // Draw center line
-            this.canvasCtx.strokeStyle = 'rgba(68, 68, 68, 0.3)';
-            this.canvasCtx.beginPath();
-            this.canvasCtx.moveTo(0, height / 2);
-            this.canvasCtx.lineTo(width, height / 2);
-            this.canvasCtx.stroke();
-        };
-
-        draw();
+        // Canvas ripple/flutter effect
+        this.drawRipples(bass, mid, overall);
     }
 
-    stopVisualization() {
-        if (this.animationFrame) {
-            cancelAnimationFrame(this.animationFrame);
-            this.animationFrame = null;
+    getAverage(array, start, end) {
+        let sum = 0;
+        for (let i = start; i < end && i < array.length; i++) {
+            sum += array[i];
+        }
+        return sum / (end - start);
+    }
+
+    updatePhotoEffects(bass, mid, high, overall) {
+        // Subtle brightness/contrast shifts based on audio
+        const brightness = 0.9 + overall * 0.2;
+        const contrast = 1.0 + bass * 0.15;
+        const blur = Math.max(0, (1 - overall) * 0.5);
+
+        // Subtle scale breathing
+        const scale = 1.0 + bass * 0.02;
+
+        this.photo.style.filter = `
+            grayscale(100%)
+            contrast(${contrast})
+            brightness(${brightness})
+            blur(${blur}px)
+        `;
+        this.photo.style.transform = `translate(-50%, -50%) scale(${scale})`;
+
+        // Opacity flutters with high frequencies
+        const opacity = 0.85 + high * 0.15;
+        this.photo.style.opacity = opacity;
+    }
+
+    drawRipples(bass, mid, overall) {
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
+        // Fade previous frame
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        this.ctx.fillRect(0, 0, w, h);
+
+        // Draw subtle noise/grain that reacts to audio
+        if (overall > 0.1) {
+            const intensity = overall * 50;
+            const imageData = this.ctx.getImageData(0, 0, w, h);
+
+            for (let i = 0; i < imageData.data.length; i += 40) {
+                if (Math.random() < overall * 0.3) {
+                    const noise = (Math.random() - 0.5) * intensity;
+                    imageData.data[i] = Math.max(0, Math.min(255, noise + 128));
+                    imageData.data[i + 1] = Math.max(0, Math.min(255, noise + 128));
+                    imageData.data[i + 2] = Math.max(0, Math.min(255, noise + 128));
+                    imageData.data[i + 3] = Math.abs(noise);
+                }
+            }
+
+            this.ctx.putImageData(imageData, 0, 0);
         }
 
-        // Clear canvas
-        const width = this.canvas.width / window.devicePixelRatio;
-        const height = this.canvas.height / window.devicePixelRatio;
-        this.canvasCtx.fillStyle = 'rgba(10, 10, 10, 1)';
-        this.canvasCtx.fillRect(0, 0, width, height);
+        // Horizontal scan lines that flutter with bass
+        if (bass > 0.2) {
+            this.ctx.strokeStyle = `rgba(255, 255, 255, ${bass * 0.1})`;
+            this.ctx.lineWidth = 1;
+
+            const numLines = Math.floor(bass * 5);
+            for (let i = 0; i < numLines; i++) {
+                const y = Math.random() * h;
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, y);
+                this.ctx.lineTo(w, y);
+                this.ctx.stroke();
+            }
+        }
     }
 }
 
-// Initialize player when DOM is ready
+// Start when ready
 document.addEventListener('DOMContentLoaded', () => {
-    window.flutterbox = new FlutterboxPlayer();
+    window.flutterbox = new Flutterbox();
 });
